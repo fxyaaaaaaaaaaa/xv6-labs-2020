@@ -85,10 +85,10 @@ allocpid() {
   return pid;
 }
 
-// Look in the process table for an UNUSED proc.
-// If found, initialize state required to run in the kernel,
-// and return with p->lock held.
-// If there are no free procs, or a memory allocation fails, return 0.
+// 在进程表中查找一个 UNUSED 的进程。
+// 如果找到，则初始化在内核中运行所需的状态，
+// 并在持有 p->lock 的情况下返回。
+// 如果没有空闲的进程，或者内存分配失败，则返回 0。
 static struct proc*
 allocproc(void)
 {
@@ -126,6 +126,7 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+  p->kama_syscall_trace = 0; //创建新进程的时候,kama_syscall_trace 设置为默认值0
 
   return p;
 }
@@ -253,8 +254,8 @@ growproc(int n)
   return 0;
 }
 
-// Create a new process, copying the parent.
-// Sets up child kernel stack to return as if from fork() system call.
+// 创建一个新进程，复制父进程。
+// 设置子进程的内核栈，使其返回时如同从 fork() 系统调用返回。
 int
 fork(void)
 {
@@ -296,7 +297,7 @@ fork(void)
   np->state = RUNNABLE;
 
   release(&np->lock);
-
+  np->kama_syscall_trace = p->kama_syscall_trace; //子进程继承父进程的syscall_trace
   return pid;
 }
 
@@ -691,5 +692,22 @@ procdump(void)
       state = "???";
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
+  }
+}
+//计算进程的数量
+//在proc.c中有一个进程表struct proc proc[NPROC]记录了所有的进程
+//每一个进程都有一个state的属性,表示该进程是否使用。遍历proc进程表，判断当前进程是否使用
+//使用 + 1
+void
+kama_procnum(uint64 *dst)
+{
+  *dst = 0;
+  struct proc*p;
+  for(p = proc;p<&proc[NPROC];p++)
+  {
+      if(p->state !=UNUSED)
+      {
+        (*dst)++;
+      }
   }
 }
