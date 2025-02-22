@@ -3,21 +3,24 @@
 #include "user/user.h"
 #include "kernel/fs.h"
 
+//取出文件名字 并将其格式化为固定长度DIRSIZE + 1
 char*
 fmtname(char *path)
 {
   static char buf[DIRSIZ+1];
   char *p;
 
-  // Find first character after last slash.
+  // 查找最后一个斜杠后的第一个字符
   for(p=path+strlen(path); p >= path && *p != '/'; p--)
     ;
   p++;
 
-  // Return blank-padded name.
+  // 返回空白填充的名称.
   if(strlen(p) >= DIRSIZ)
     return p;
+  //将字符串p移动到buf里
   memmove(buf, p, strlen(p));
+  //将字符串buf中不足长度的补' '
   memset(buf+strlen(p), ' ', DIRSIZ-strlen(p));
   return buf;
 }

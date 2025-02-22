@@ -36,3 +36,5 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
+entry("trace"); #为trace添加系统调用接口 这是用户态到内核态的跳板函数
+entry("sysinfo");

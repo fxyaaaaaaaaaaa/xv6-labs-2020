@@ -38,8 +38,8 @@ main(void)
     }
 
     for(;;){
-      // this call to wait() returns if the shell exits,
-      // or if a parentless process exits.
+      //如果 shell 退出，则返回对 wait()的此调用，
+      //或者无父进程退出。
       wpid = wait((int *) 0);
       if(wpid == pid){
         // the shell exited; restart it.
