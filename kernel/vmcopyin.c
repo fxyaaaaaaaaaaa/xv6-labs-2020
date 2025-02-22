@@ -6,8 +6,8 @@
 #include "proc.h"
 
 //
-// This file contains copyin_new() and copyinstr_new(), the
-// replacements for copyin and coyinstr in vm.c.
+// 这个文件包含 copyin_new() 和 copyinstr_new()，
+// 它们是 vm.c 中 copyin 和 copyinstr 的替代品。
 //
 
 static struct stats {
@@ -23,9 +23,9 @@ statscopyin(char *buf, int sz) {
   return n;
 }
 
-// Copy from user to kernel.
-// Copy len bytes to dst from virtual address srcva in a given page table.
-// Return 0 on success, -1 on error.
+// 从用户空间复制到内核空间。
+// 从给定页表中的虚拟地址 srcva 复制 len 字节到 dst。
+// 成功返回 0，错误返回 -1。
 int
 copyin_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
@@ -38,10 +38,10 @@ copyin_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
   return 0;
 }
 
-// Copy a null-terminated string from user to kernel.
-// Copy bytes to dst from virtual address srcva in a given page table,
-// until a '\0', or max.
-// Return 0 on success, -1 on error.
+// 从用户空间复制一个以 null 结尾的字符串到内核空间。
+// 从给定页表中的虚拟地址 srcva 复制字节到 dst，
+// 直到遇到 '\0'，或达到 max。
+// 成功返回 0，错误返回 -1。
 int
 copyinstr_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {

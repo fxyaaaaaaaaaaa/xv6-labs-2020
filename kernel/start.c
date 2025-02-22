@@ -16,36 +16,36 @@ uint64 mscratch0[NCPU * 32];
 // assembly code in kernelvec.S for machine-mode timer interrupt.
 extern void timervec();
 
-// entry.S jumps here in machine mode on stack0.
+// entry.S 在 machine mode 下跳转到 stack0。
 void
 start()
 {
-  // set M Previous Privilege mode to Supervisor, for mret.
+  // 设置 M Previous Privilege mode 为 Supervisor，以便 mret 使用。
   unsigned long x = r_mstatus();
   x &= ~MSTATUS_MPP_MASK;
   x |= MSTATUS_MPP_S;
   w_mstatus(x);
 
-  // set M Exception Program Counter to main, for mret.
-  // requires gcc -mcmodel=medany
+  // 设置 M Exception Program Counter 为 main，以便 mret 使用。
+  // 需要 gcc -mcmodel=medany
   w_mepc((uint64)main);
 
-  // disable paging for now.
+  // 现在禁用分页。
   w_satp(0);
 
-  // delegate all interrupts and exceptions to supervisor mode.
+  // 将所有中断和异常委托给 supervisor mode。
   w_medeleg(0xffff);
   w_mideleg(0xffff);
   w_sie(r_sie() | SIE_SEIE | SIE_STIE | SIE_SSIE);
 
-  // ask for clock interrupts.
+  // 请求时钟中断。
   timerinit();
 
-  // keep each CPU's hartid in its tp register, for cpuid().
+  // 将每个 CPU 的 hartid 保存在其 tp 寄存器中，以便 cpuid() 使用。
   int id = r_mhartid();
   w_tp(id);
 
-  // switch to supervisor mode and jump to main().
+  // 切换到 supervisor mode 并跳转到 main()。
   asm volatile("mret");
 }
 

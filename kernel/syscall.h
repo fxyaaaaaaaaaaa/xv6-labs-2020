@@ -20,3 +20,5 @@
 #define SYS_link   19
 #define SYS_mkdir  20
 #define SYS_close  21
+#define SYS_trace  22  //trace的系统调用号 掩码的形式
+#define SYS_sysinfo   23  //sys_info的系统调用号 掩码的形式

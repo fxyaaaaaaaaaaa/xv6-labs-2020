@@ -51,6 +51,8 @@ exec(char *path, char **argv)
     uint64 sz1;
     if((sz1 = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz)) == 0)
       goto bad;
+    if(sz1 >=PLIC)
+      goto bad;
     sz = sz1;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
@@ -108,6 +110,9 @@ exec(char *path, char **argv)
       last = s+1;
   safestrcpy(p->name, last, sizeof(p->name));
     
+  //清除内核页表中对程序内存的旧映射,然后重新建立映射
+  uvmunmap(p->kama_kernelpgtbl,0,PGROUNDUP(oldsz)/PGSIZE,0);
+  kama_kvmcopymappings(pagetable,p->kama_kernelpgtbl,0,oldsz);
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
@@ -115,7 +120,8 @@ exec(char *path, char **argv)
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
-
+  if(p->pid == 1)
+      kama_vmprint(p->pagetable);
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
@@ -127,11 +133,11 @@ exec(char *path, char **argv)
   }
   return -1;
 }
+// 将程序段加载到虚拟地址 va 的页表中。
+// va 必须是页面对齐的
+// 并且从 va 到 va+sz 的页面必须已经映射。
+// 成功返回 0，失败返回 -1。
 
-// Load a program segment into pagetable at virtual address va.
-// va must be page-aligned
-// and the pages from va to va+sz must already be mapped.
-// Returns 0 on success, -1 on failure.
 static int
 loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset, uint sz)
 {

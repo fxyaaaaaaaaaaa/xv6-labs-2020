@@ -15,6 +15,9 @@
 #include "defs.h"
 #include "proc.h"
 
+//这个变量用于指示系统是否进入了panic状态，当系统遇到了严重错误时，会调用panic函数，将panicked设置为1.
+//并进入无限循环。volatile关键字告诉编译器这个变量的值可能会在程序的其他部分被更改，因此编译器不应该对这个变量进行优化。
+
 volatile int panicked = 0;
 
 // lock to avoid interleaving concurrent printf's.
@@ -113,15 +116,17 @@ printf(char *fmt, ...)
   if(locking)
     release(&pr.lock);
 }
-
+/*panic 函数用于处理系统中的严重错误。
+当调用 panic 函数时，系统会打印错误信息并进入无限循环，从而停止进一步的执行。
+*/
 void
 panic(char *s)
 {
-  pr.locking = 0;
   printf("panic: ");
+  pr.locking = 0;
   printf(s);
   printf("\n");
-  panicked = 1; // freeze uart output from other CPUs
+  panicked = 1; // 冻结其他CPU的uart输出
   for(;;)
     ;
 }

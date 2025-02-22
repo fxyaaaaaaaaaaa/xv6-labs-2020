@@ -10,35 +10,35 @@
 #include "proc.h"
 #include "defs.h"
 
-// the UART control registers are memory-mapped
-// at address UART0. this macro returns the
-// address of one of the registers.
+// UART 控制寄存器是内存映射的
+// 在地址 UART0 处。此宏返回
+// 其中一个寄存器的地址。
 #define Reg(reg) ((volatile unsigned char *)(UART0 + reg))
 
-// the UART control registers.
-// some have different meanings for
-// read vs write.
-// see http://byterunner.com/16550.html
-#define RHR 0                 // receive holding register (for input bytes)
-#define THR 0                 // transmit holding register (for output bytes)
-#define IER 1                 // interrupt enable register
+// UART 控制寄存器。
+// 有些具有不同的含义
+// 读取与写入。
+// 请参阅 http://byterunner.com/16550.html
+#define RHR 0                 // 接收保持寄存器 (用于输入字节)
+#define THR 0                 // 发送保持寄存器 (用于输出字节)
+#define IER 1                 // 中断使能寄存器
 #define IER_TX_ENABLE (1<<0)
 #define IER_RX_ENABLE (1<<1)
-#define FCR 2                 // FIFO control register
+#define FCR 2                 // FIFO 控制寄存器
 #define FCR_FIFO_ENABLE (1<<0)
-#define FCR_FIFO_CLEAR (3<<1) // clear the content of the two FIFOs
-#define ISR 2                 // interrupt status register
-#define LCR 3                 // line control register
+#define FCR_FIFO_CLEAR (3<<1) // 清除两个 FIFO 的内容
+#define ISR 2                 // 中断状态寄存器
+#define LCR 3                 // 线控寄存器
 #define LCR_EIGHT_BITS (3<<0)
-#define LCR_BAUD_LATCH (1<<7) // special mode to set baud rate
-#define LSR 5                 // line status register
-#define LSR_RX_READY (1<<0)   // input is waiting to be read from RHR
-#define LSR_TX_IDLE (1<<5)    // THR can accept another character to send
+#define LCR_BAUD_LATCH (1<<7) // 特殊模式设置波特率
+#define LSR 5                 // 线路状态寄存器
+#define LSR_RX_READY (1<<0)   // input 正在等待从 RHR 读取
+#define LSR_TX_IDLE (1<<5)    // THR 可以接受另一个字符发送
 
 #define ReadReg(reg) (*(Reg(reg)))
 #define WriteReg(reg, v) (*(Reg(reg)) = (v))
 
-// the transmit output buffer.
+//  发送输出缓冲区。
 struct spinlock uart_tx_lock;
 #define UART_TX_BUF_SIZE 32
 char uart_tx_buf[UART_TX_BUF_SIZE];
@@ -52,26 +52,30 @@ void uartstart();
 void
 uartinit(void)
 {
+  //printf("uartinit\n");
   // disable interrupts.
+  // 禁止中断
   WriteReg(IER, 0x00);
 
   // special mode to set baud rate.
   WriteReg(LCR, LCR_BAUD_LATCH);
 
-  // LSB for baud rate of 38.4K.
+  // 波特率为 38.4K 的 LSB
   WriteReg(0, 0x03);
 
-  // MSB for baud rate of 38.4K.
+  // 波特率为 38.4K 的 MSB.
   WriteReg(1, 0x00);
 
   // leave set-baud mode,
   // and set word length to 8 bits, no parity.
+  //离开 set-baud 模式，
+  //并将字长设置为 8 位，无奇偶校验。
   WriteReg(LCR, LCR_EIGHT_BITS);
 
-  // reset and enable FIFOs.
+  // 重置和启用 FIFO
   WriteReg(FCR, FCR_FIFO_ENABLE | FCR_FIFO_CLEAR);
 
-  // enable transmit and receive interrupts.
+  // 使能 TRANSMIT 和 RECEIVE INTERRUPTS。
   WriteReg(IER, IER_TX_ENABLE | IER_RX_ENABLE);
 
   initlock(&uart_tx_lock, "uart");
@@ -83,9 +87,17 @@ uartinit(void)
 // because it may block, it can't be called
 // from interrupts; it's only suitable for use
 // by write().
+
+// 向 Output Buffer 添加一个字符，并告诉
+// UART 开始发送（如果尚未开始发送）。
+// 如果输出缓冲区已满，则阻止。
+// 因为它可能会阻塞，所以不能调用
+// 从中断;它只适合使用
+// by write（） 来获取。
 void
 uartputc(int c)
 {
+  //printf("uartputc\n");
   acquire(&uart_tx_lock);
 
   if(panicked){
@@ -108,13 +120,16 @@ uartputc(int c)
   }
 }
 
-// alternate version of uartputc() that doesn't 
-// use interrupts, for use by kernel printf() and
-// to echo characters. it spins waiting for the uart's
-// output register to be empty.
+
+
+// uartputc()的替代版本，它不会
+// use interrupts，供内核 printf()和
+// 以回显字符。它旋转等待 UART 的
+// output register 为空。
 void
 uartputc_sync(int c)
 {
+  //printf("uartputc_sync\n");
   push_off();
 
   if(panicked){
@@ -137,23 +152,24 @@ uartputc_sync(int c)
 void
 uartstart()
 {
+  //printf("uartstart\n");
   while(1){
+    // transmit buffer is empty.
     if(uart_tx_w == uart_tx_r){
-      // transmit buffer is empty.
       return;
     }
     
     if((ReadReg(LSR) & LSR_TX_IDLE) == 0){
-      // the UART transmit holding register is full,
-      // so we cannot give it another byte.
-      // it will interrupt when it's ready for a new byte.
+      // UART 发送保持寄存器已满，
+      // 所以我们不能给它另一个字节。
+      // 当它准备好新字节时，它会中断。
       return;
     }
     
     int c = uart_tx_buf[uart_tx_r];
     uart_tx_r = (uart_tx_r + 1) % UART_TX_BUF_SIZE;
     
-    // maybe uartputc() is waiting for space in the buffer.
+    // 也许 uartputc() 正在等待缓冲区中的空间。
     wakeup(&uart_tx_r);
     
     WriteReg(THR, c);
@@ -162,9 +178,12 @@ uartstart()
 
 // read one input character from the UART.
 // return -1 if none is waiting.
+// 从 UART 读取一个输入字符。
+// 如果没有等待，则返回 -1。
 int
 uartgetc(void)
 {
+  //printf("uartgetc\n");
   if(ReadReg(LSR) & 0x01){
     // input data is ready.
     return ReadReg(RHR);
@@ -173,13 +192,17 @@ uartgetc(void)
   }
 }
 
-// handle a uart interrupt, raised because input has
-// arrived, or the uart is ready for more output, or
-// both. called from trap.c.
+
+// 处理一个 UART 中断，中断可能由于以下原因触发：
+// 1. 输入数据到达（接收缓冲区中有新数据）。
+// 2. UART 准备好发送更多数据（发送缓冲区有空闲）。
+// 3. 以上两种情况同时发生。
+// 该函数由 trap.c 调用。
 void
 uartintr(void)
 {
-  // read and process incoming characters.
+  //printf("uartintr\n");
+  //读取和处理传入字符。
   while(1){
     int c = uartgetc();
     if(c == -1)

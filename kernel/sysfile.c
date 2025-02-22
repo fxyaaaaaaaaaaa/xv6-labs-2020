@@ -15,9 +15,11 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+//包含与文件系统相关的系统调用。这些系统调用涉及到文件的打开，关闭，读写，创建，删除等操作。
 
-// Fetch the nth word-sized system call argument as a file descriptor
-// and return both the descriptor and the corresponding struct file.
+
+
+//argfd 是从陷阱帧中获取第n个参数而这个参数是作为文件描述符使用的
 static int
 argfd(int n, int *pfd, struct file **pf)
 {
@@ -35,8 +37,8 @@ argfd(int n, int *pfd, struct file **pf)
   return 0;
 }
 
-// Allocate a file descriptor for the given file.
-// Takes over file reference from caller on success.
+// 为给定文件分配一个文件描述符。
+// 成功时接管调用者的文件引用。
 static int
 fdalloc(struct file *f)
 {

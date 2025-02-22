@@ -3,8 +3,8 @@
 #   void swtch(struct context *old, struct context *new);
 # 
 # Save current registers in old. Load from new.	
-
-
+# sd和ld是两条指令分别用于存储和加载双字(64位)数据
+#在RISC-V汇编语言中，a0和a1是函数调用约定中的传递参数寄存器，具体来说a0和a1分别代表传递函数的第一个和第二个参数。
 .globl swtch
 swtch:
         sd ra, 0(a0)

@@ -7,31 +7,24 @@
 #include "fs.h"
 #include "buf.h"
 
-// Simple logging that allows concurrent FS system calls.
+// 允许并发文件系统调用的简单日志记录。
 //
-// A log transaction contains the updates of multiple FS system
-// calls. The logging system only commits when there are
-// no FS system calls active. Thus there is never
-// any reasoning required about whether a commit might
-// write an uncommitted system call's updates to disk.
+// 日志事务包含多个文件系统调用的更新。日志系统仅在没有活动的文件系统调用时提交。
+// 因此，从不需要考虑提交是否可能将未提交的系统调用更新写入磁盘。
 //
-// A system call should call begin_op()/end_op() to mark
-// its start and end. Usually begin_op() just increments
-// the count of in-progress FS system calls and returns.
-// But if it thinks the log is close to running out, it
-// sleeps until the last outstanding end_op() commits.
+// 系统调用应调用 begin_op()/end_op() 来标记其开始和结束。
+// 通常，begin_op() 只是增加进行中的文件系统调用的计数并返回。
+// 但如果它认为日志即将耗尽，它会休眠直到最后一个未完成的 end_op() 提交。
 //
-// The log is a physical re-do log containing disk blocks.
-// The on-disk log format:
-//   header block, containing block #s for block A, B, C, ...
-//   block A
-//   block B
-//   block C
+// 日志是包含磁盘块的物理重做日志。磁盘上的日志格式：
+//   头块，包含块 A、B、C 等的块号
+//   块 A
+//   块 B
+//   块 C
 //   ...
-// Log appends are synchronous.
+// 日志追加是同步的。
 
-// Contents of the header block, used for both the on-disk header block
-// and to keep track in memory of logged block# before commit.
+// 头块的内容，用于磁盘上的头块和在提交前跟踪内存中记录的块号。
 struct logheader {
   int n;
   int block[LOGSIZE];

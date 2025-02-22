@@ -7,7 +7,7 @@
 #include "syscall.h"
 #include "defs.h"
 
-// Fetch the uint64 at addr from the current process.
+// 从当前进程中获取addr处的uint64。
 int
 fetchaddr(uint64 addr, uint64 *ip)
 {
@@ -19,8 +19,8 @@ fetchaddr(uint64 addr, uint64 *ip)
   return 0;
 }
 
-// Fetch the nul-terminated string at addr from the current process.
-// Returns length of string, not including nul, or -1 for error.
+// 从当前进程中获取addr处的以nul结尾的字符串。
+// 返回字符串长度，不包括nul，或错误时返回-1。
 int
 fetchstr(uint64 addr, char *buf, int max)
 {
@@ -35,6 +35,9 @@ static uint64
 argraw(int n)
 {
   struct proc *p = myproc();
+
+  //从当前进程的trapframe中获取系统调用参数
+  //a0-a5是系统调用参数代表第0到第5个参数，a7是系统调用号
   switch (n) {
   case 0:
     return p->trapframe->a0;
@@ -53,7 +56,7 @@ argraw(int n)
   return -1;
 }
 
-// Fetch the nth 32-bit system call argument.
+// 获取第n个32位系统调用参数。从当前进程的陷阱帧中获取。
 int
 argint(int n, int *ip)
 {
@@ -61,9 +64,8 @@ argint(int n, int *ip)
   return 0;
 }
 
-// Retrieve an argument as a pointer.
-// Doesn't check for legality, since
-// copyin/copyout will do that.
+// 将参数作为指针检索。
+// 不检查合法性，因为copyin/copyout会进行检查。
 int
 argaddr(int n, uint64 *ip)
 {
@@ -71,9 +73,9 @@ argaddr(int n, uint64 *ip)
   return 0;
 }
 
-// Fetch the nth word-sized system call argument as a null-terminated string.
-// Copies into buf, at most max.
-// Returns string length if OK (including nul), -1 if error.
+// 将第n个字大小的系统调用参数作为以null结尾的字符串获取。
+// 复制到buf中，最多max个字符。
+// 如果成功返回字符串长度（包括nul），错误返回-1。
 int
 argstr(int n, char *buf, int max)
 {
@@ -104,7 +106,10 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
+extern uint64 sys_trace(void);  // 全局声明trace系统调用处理函数
+extern uint64 sys_sysinfo(void); // 全局声明sysinfo系统调用函数
 
+// 函数指针数组，里面存放系统调用号和对应的处理函数
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
 [SYS_exit]    sys_exit,
@@ -129,15 +134,47 @@ static uint64 (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 };
 
+// 定义系统调用名称的字符串数组
+const char* kama_syscall_names[]=
+{
+  [SYS_fork]    "fork",
+  [SYS_exit]    "exit",
+  [SYS_wait]    "wait",
+  [SYS_pipe]    "pipe",
+  [SYS_read]    "read",
+  [SYS_kill]    "kill",
+  [SYS_exec]    "exec",
+  [SYS_fstat]   "fstat",
+  [SYS_chdir]   "chdir",
+  [SYS_dup]     "dup",
+  [SYS_getpid]  "getpid",
+  [SYS_sbrk]    "sbrk",
+  [SYS_sleep]   "sleep",
+  [SYS_uptime]  "uptime",
+  [SYS_open]    "open",
+  [SYS_write]   "write",
+  [SYS_mknod]   "mknod",
+  [SYS_unlink]  "unlink",
+  [SYS_link]    "link",
+  [SYS_mkdir]   "mkdir",
+  [SYS_close]   "close",
+};
+
+// 所有的系统调用都会在syscall()函数进行处理。因此可以在这里打印跟踪信息。
 void
 syscall(void)
 {
   int num;
   struct proc *p = myproc();
-
+  // 获取系统调用号
   num = p->trapframe->a7;
+  // 如果系统调用号有效（大于0且小于syscalls数组的长度，并且对应的处理函数存在）
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
+    // 调用对应的处理函数，并将返回值存储在a0寄存器中
     p->trapframe->a0 = syscalls[num]();
+
+    // 如果当前进程启动了trace跟踪，则打印信息
+    // 这里将kama_syscall_trace >>num &1是为了判断当前进程是否跟踪系统调用号为num的系统调用
   } else {
     printf("%d %s: unknown sys call %d\n",
             p->pid, p->name, num);

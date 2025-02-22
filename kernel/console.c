@@ -23,7 +23,7 @@
 #include "proc.h"
 
 #define BACKSPACE 0x100
-#define C(x)  ((x)-'@')  // Control-x
+#define C(x)  ((x)-'@')  // Control-x 用于将字母字符转换为对应的控制字符
 
 //
 // send one character to the uart.
@@ -33,6 +33,7 @@
 void
 consputc(int c)
 {
+  printf("consputc");
   if(c == BACKSPACE){
     // if the user typed backspace, overwrite with a space.
     uartputc_sync('\b'); uartputc_sync(' '); uartputc_sync('\b');
@@ -58,6 +59,7 @@ struct {
 int
 consolewrite(int user_src, uint64 src, int n)
 {
+  //printf("consolewrite");
   int i;
 
   acquire(&cons.lock);
@@ -77,10 +79,11 @@ consolewrite(int user_src, uint64 src, int n)
 // copy (up to) a whole input line to dst.
 // user_dist indicates whether dst is a user
 // or kernel address.
-//
+
 int
 consoleread(int user_dst, uint64 dst, int n)
 {
+  //printf("consoleread");
   uint target;
   int c;
   char cbuf;
@@ -129,14 +132,15 @@ consoleread(int user_dst, uint64 dst, int n)
 }
 
 //
-// the console input interrupt handler.
-// uartintr() calls this for input character.
-// do erase/kill processing, append to cons.buf,
-// wake up consoleread() if a whole line has arrived.
-//
+// 控制台输入中断处理程序。
+// uartintr（） 对 Input Character 调用此函数。
+// 执行 Erase/kill 处理，附加到 cons.buf，
+// 如果整行已到达，请唤醒 consoleread（）。
+//处理控制台输入，包括特殊控制字符和普通字符，维护输入缓冲区，并在适当的时候唤醒等待读取的进程。
 void
 consoleintr(int c)
 {
+ // printf("consoleintr");
   acquire(&cons.lock);
 
   switch(c){
@@ -183,6 +187,7 @@ consoleintr(int c)
 void
 consoleinit(void)
 {
+  //printf("consoleinit");
   initlock(&cons.lock, "cons");
 
   uartinit();

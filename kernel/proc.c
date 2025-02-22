@@ -30,23 +30,22 @@ procinit(void)
   initlock(&pid_lock, "nextpid");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
-
-      // Allocate a page for the process's kernel stack.
-      // Map it high in memory, followed by an invalid
-      // guard page.
-      char *pa = kalloc();
-      if(pa == 0)
-        panic("kalloc");
-      uint64 va = KSTACK((int) (p - proc));
-      kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
-      p->kstack = va;
+      // 为进程的内核栈分配一个页。
+      // 将其映射到内存的高地址，后面跟一个无效的保护页。 
+      // char *pa = kalloc();
+      // if(pa == 0)
+      //   panic("kalloc");
+      // //这里p-proc是指针的计算，指针相减结果是和类型有关的，计算的其实是p在数组中的索引
+      // //计算出进程在内核栈所处的虚拟空间
+      // uint64 va = KSTACK((int) (p - proc));
+      // kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
+      // p->kstack = va;
   }
   kvminithart();
 }
 
-// Must be called with interrupts disabled,
-// to prevent race with process being moved
-// to a different CPU.
+// 必须在禁用中断的情况下调用，
+// 以防止进程被移动到不同的CPU时发生竞争。
 int
 cpuid()
 {
@@ -63,7 +62,7 @@ mycpu(void) {
   return c;
 }
 
-// Return the current struct proc *, or zero if none.
+// 返回当前的 struct proc *，如果没有则返回零。
 struct proc*
 myproc(void) {
   push_off();
@@ -85,10 +84,10 @@ allocpid() {
   return pid;
 }
 
-// Look in the process table for an UNUSED proc.
-// If found, initialize state required to run in the kernel,
-// and return with p->lock held.
-// If there are no free procs, or a memory allocation fails, return 0.
+// 在进程表中查找 UNUSED 状态的进程。
+// 如果找到，初始化在内核中运行所需的状态，
+// 并在返回时保持 p->lock。
+// 如果没有空闲的进程，或者内存分配失败，则返回 0。
 static struct proc*
 allocproc(void)
 {
@@ -105,14 +104,17 @@ allocproc(void)
   return 0;
 
 found:
+  //1.先分配一个pid
   p->pid = allocpid();
 
+  //2.分配一个trapframe
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     release(&p->lock);
     return 0;
   }
 
+  //3.给一个空闲的用户页表
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
@@ -120,11 +122,24 @@ found:
     release(&p->lock);
     return 0;
   }
+  // 为新进程创建独立的内核页表，并将内核所需要的各种映射添加到新页表上
+  p->kama_kernelpgtbl = kama_kvminit_newpgtbl();
+  
+  // 4. 分配一个物理页，作为新进程的内核栈使用
+  char* pa =kalloc();
+  if (pa == 0)
+        panic("kallo");
+  uint64 va = KSTACK((int)0); //将内核栈映射到固定的逻辑地址上
+  kvmmap(p->kama_kernelpgtbl,va,(uint64)pa,PGSIZE,PTE_R | PTE_W);
+  p->kstack = va; //记录内核栈的虚拟地址
 
-  // Set up new context to start executing at forkret,
-  // which returns to user space.
+ //context是关于进程调度的上下文保存的，ra是记录了函数地址
+ //sp是记录了栈顶指针，创建一个进程时将上下文设置为forkret函数，当创建的进程
+ //被第一次调度时从forkret函数开始执行，forkret函数会完成进程创建的最后一步，然后返回到用户空间。
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
+
+  //因为ra返回地址在内核空间，所以将sp指针设置为新进程的内核栈顶部。
   p->context.sp = p->kstack + PGSIZE;
 
   return p;
@@ -149,11 +164,23 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+
+
+  //释放进程的内核栈
+  void* kstack_pa =(void*)kvmpa(p->kama_kernelpgtbl,p->kstack);
+  kfree(kstack_pa);
+  p->kstack = 0;
+
+  //不能使用proc_freepagetable 释放页表，因为其不仅会释放页表本身，还会把页表内所有的叶子节点物理页也释放
+  //这会导致内核运行所需要的关键物理页被释放，导致内核崩溃
+  //递归释放进程独享的页表，释放页表本身所占用空间，但不释放页表指向的物理页。
+  kama_kvm_free_kernelpgtbl(p->kama_kernelpgtbl);
+  p->kama_kernelpgtbl = 0;
   p->state = UNUSED;
 }
 
-// Create a user page table for a given process,
-// with no user memory, but with trampoline pages.
+// 为给定进程创建一个用户页表，
+// 没有用户内存，但有跳板页。
 pagetable_t
 proc_pagetable(struct proc *p)
 {
@@ -164,17 +191,15 @@ proc_pagetable(struct proc *p)
   if(pagetable == 0)
     return 0;
 
-  // map the trampoline code (for system call return)
-  // at the highest user virtual address.
-  // only the supervisor uses it, on the way
-  // to/from user space, so not PTE_U.
+  // 将跳板代码（用于系统调用返回）映射到最高的用户虚拟地址。
+  // 只有主管理员在往返用户空间时使用它，因此不需要 PTE_U。
   if(mappages(pagetable, TRAMPOLINE, PGSIZE,
               (uint64)trampoline, PTE_R | PTE_X) < 0){
     uvmfree(pagetable, 0);
     return 0;
   }
 
-  // map the trapframe just below TRAMPOLINE, for trampoline.S.
+  // 将陷阱帧映射到 TRAMPOLINE 之下，用于 trampoline.S。
   if(mappages(pagetable, TRAPFRAME, PGSIZE,
               (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
     uvmunmap(pagetable, TRAMPOLINE, 1, 0);
@@ -220,7 +245,8 @@ userinit(void)
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
-
+  //同步程序内存映射到进程内核页表中
+  kama_kvmcopymappings(p->pagetable,p->kama_kernelpgtbl,0,p->sz);
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
   p->trapframe->sp = PGSIZE;  // user stack pointer
@@ -243,11 +269,21 @@ growproc(int n)
 
   sz = p->sz;
   if(n > 0){
-    if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
+    uint64 newsz;
+    if((newsz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
+
+    if(kama_kvmcopymappings(p->pagetable,p->kama_kernelpgtbl,sz,n) != 0)
+    {
+      uvmdealloc(p->pagetable,newsz,sz);
+      return -1;
+    }
+    sz = newsz;
   } else if(n < 0){
-    sz = uvmdealloc(p->pagetable, sz, sz + n);
+    uvmdealloc(p->pagetable,sz,sz + n);
+    //内核页表中的映射同步缩小
+    sz = kama_kvmdealloc(p->kama_kernelpgtbl,sz,sz + n);
   }
   p->sz = sz;
   return 0;
@@ -268,9 +304,10 @@ fork(void)
   }
 
   // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
-    freeproc(np);
-    release(&np->lock);
+  if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0 ||
+      kama_kvmcopymappings(np->pagetable, np->kama_kernelpgtbl, 0, p->sz) < 0) {
+      freeproc(np);
+      release(&np->lock);
     return -1;
   }
   np->sz = p->sz;
@@ -446,13 +483,12 @@ wait(uint64 addr)
   }
 }
 
-// Per-CPU process scheduler.
-// Each CPU calls scheduler() after setting itself up.
-// Scheduler never returns.  It loops, doing:
-//  - choose a process to run.
-//  - swtch to start running that process.
-//  - eventually that process transfers control
-//    via swtch back to the scheduler.
+// 每个CPU的进程调度器。
+// 每个CPU在设置好自己后调用scheduler()。
+// 调度器永远不会返回。 它循环执行以下操作：
+//  - 选择一个进程运行。
+//  - 切换到开始运行该进程。
+//  - 最终该进程通过swtch将控制权转回调度器。
 void
 scheduler(void)
 {
@@ -461,22 +497,29 @@ scheduler(void)
   
   c->proc = 0;
   for(;;){
-    // Avoid deadlock by ensuring that devices can interrupt.
+    // 设置sstatus寄存器，确保设备可以中断。
     intr_on();
     
     int found = 0;
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
+        // 切换到选择的进程。进程的任务是
+        // 释放它的锁，然后在跳回我们之前重新获取它。
         p->state = RUNNING;
         c->proc = p;
+
+        // 切换到进程独立的内核页表
+        w_satp(MAKE_SATP(p->kama_kernelpgtbl));
+        sfence_vma();   //清除快表缓存，刷新TLB缓存，以确保地址转换表的更改生效
+
+        // 调度，执行程序
         swtch(&c->context, &p->context);
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
+        //切换回全局内核页表
+        kvminithart();
+        // 进程现在已经运行完毕。
+        // 在返回之前，它应该已经更改了它的 p->state。
         c->proc = 0;
 
         found = 1;
@@ -532,8 +575,8 @@ yield(void)
   release(&p->lock);
 }
 
-// A fork child's very first scheduling by scheduler()
-// will swtch to forkret.
+// fork 子进程第一次被调度器调度时
+// 将切换到 forkret。
 void
 forkret(void)
 {
@@ -543,7 +586,7 @@ forkret(void)
   release(&myproc()->lock);
 
   if (first) {
-    // File system initialization must be run in the context of a
+    // 文件系
     // regular process (e.g., because it calls sleep), and thus cannot
     // be run from main().
     first = 0;

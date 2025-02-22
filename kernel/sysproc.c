@@ -6,7 +6,9 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+//#include"sysinfo.h" //引入sysinfo.h头文件
 
+//包含和进程相关的系统调用。包括进程的创建，终止，等待，调度等。
 uint64
 sys_exit(void)
 {
@@ -83,8 +85,7 @@ sys_kill(void)
   return kill(pid);
 }
 
-// return how many clock tick interrupts have occurred
-// since start.
+// 返回自启动以来发生的时钟滴答中断次数
 uint64
 sys_uptime(void)
 {
@@ -95,3 +96,5 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+

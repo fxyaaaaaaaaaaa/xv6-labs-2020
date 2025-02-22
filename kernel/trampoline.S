@@ -87,21 +87,21 @@ uservec:
 .globl userret
 userret:
         # userret(TRAPFRAME, pagetable)
-        # switch from kernel to user.
-        # usertrapret() calls here.
-        # a0: TRAPFRAME, in user page table.
-        # a1: user page table, for satp.
+        # 从内核切换到用户模式。
+        # usertrapret() 调用这里。
+        # a0: TRAPFRAME，在用户页表中。
+        # a1: 用户页表，用于 satp。
 
-        # switch to the user page table.
+        # 切换到用户页表。
         csrw satp, a1
         sfence.vma zero, zero
 
-        # put the saved user a0 in sscratch, so we
-        # can swap it with our a0 (TRAPFRAME) in the last step.
+        # 将保存的用户 a0 放入 sscratch，以便我们
+        # 可以在最后一步将其与我们的 a0 (TRAPFRAME) 交换。
         ld t0, 112(a0)
         csrw sscratch, t0
 
-        # restore all but a0 from TRAPFRAME
+        # 从 TRAPFRAME 恢复所有寄存器，除了 a0
         ld ra, 40(a0)
         ld sp, 48(a0)
         ld gp, 56(a0)
@@ -133,9 +133,9 @@ userret:
         ld t5, 272(a0)
         ld t6, 280(a0)
 
-	# restore user a0, and save TRAPFRAME in sscratch
+	# 恢复用户 a0，并将 TRAPFRAME 保存到 sscratch
         csrrw a0, sscratch, a0
         
-        # return to user mode and user pc.
-        # usertrapret() set up sstatus and sepc.
+        # 返回到用户模式和用户 pc。
+        # usertrapret() 设置了 sstatus 和 sepc。
         sret
