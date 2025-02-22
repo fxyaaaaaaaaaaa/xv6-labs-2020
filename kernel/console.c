@@ -33,7 +33,8 @@
 void
 consputc(int c)
 {
-  printf("consputc");
+  //uartputc_sync("consputc\n");
+  // uartputc_sync();
   if(c == BACKSPACE){
     // if the user typed backspace, overwrite with a space.
     uartputc_sync('\b'); uartputc_sync(' '); uartputc_sync('\b');
@@ -83,7 +84,7 @@ consolewrite(int user_src, uint64 src, int n)
 int
 consoleread(int user_dst, uint64 dst, int n)
 {
-  //printf("consoleread");
+  printf("consoleread");
   uint target;
   int c;
   char cbuf;
