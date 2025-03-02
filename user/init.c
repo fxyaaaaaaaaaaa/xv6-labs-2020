@@ -15,15 +15,14 @@ int
 main(void)
 {
   int pid, wpid;
-
-  if(open("console", O_RDWR) < 0){
+  if((open("console", O_RDWR)) < 0){
     mknod("console", CONSOLE, 0);
     mknod("statistics", STATS, 0);
     open("console", O_RDWR);
   }
+  
   dup(0);  // stdout
   dup(0);  // stderr
-
   for(;;){
     printf("init: starting sh\n");
     pid = fork();

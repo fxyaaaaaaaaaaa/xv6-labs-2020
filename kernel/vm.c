@@ -132,27 +132,23 @@ walk(pagetable_t pagetable, uint64 va, int alloc)
 
 int kama_pgtblprint(pagetable_t pagetable , int depth)
 { 
-     //一个 pagetable 有512个PTE
-     for(int i=0;i< 512 ;i++)
-     {
-        pte_t pte = pagetable[i];
-
-        if( pte & PTE_V)
+   for(int i=0;i<512;i++)
+   {
+      pte_t pte = pagetable[i];
+      if((pte & PTE_V))
+      {
+        printf("..");
+        int n=depth;
+        while(n--)
+          printf( " ..");
+        printf("%d: pte %p pa %p\n",i,pte,(pagetable_t)PTE2PA(pte));
+        if( (pte & (PTE_R|PTE_W|PTE_X)) == 0)
         {
-            printf("..");
-            for(int j =0;j<depth;j++)
-            {
-                printf(" ..");
-            }
-            printf("%d: pte %p pa %p\n",i,pte,PTE2PA(pte));
-            if((pte& (PTE_R | PTE_W | PTE_X)) == 0)
-            {
-              uint64 child = PTE2PA(pte);
-              kama_pgtblprint((pagetable_t)child,depth+1);
-            } 
+          kama_pgtblprint((pagetable_t)PTE2PA(pte),depth + 1);
         }
-     } 
-     return 0;
+      }
+   }
+   return 0;
 }
 
 //打印页表
@@ -206,7 +202,7 @@ kvmmap(pagetable_t pagetable,uint64 va, uint64 pa, uint64 sz, int perm)
 uint64
 kvmpa(pagetable_t pagetable,uint64 va)
 {
-  uint64 off = va % PGSIZE;
+  uint64 off = va % PGSIZE; //获取页内偏移量
   pte_t *pte;
   uint64 pa;
   
@@ -302,6 +298,7 @@ uvminit(pagetable_t pagetable, uchar *src, uint sz)
   mem = kalloc();
   memset(mem, 0, PGSIZE);
   mappages(pagetable, 0, PGSIZE, (uint64)mem, PTE_W|PTE_R|PTE_X|PTE_U);
+  printf("222\n");
   memmove(mem, src, sz);
 }
 
@@ -488,9 +485,8 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   return -1;
 }
 
-// 将 PTE 标记为无效以供用户访问。
-// 由 exec 用于用户堆栈保护页。
 
+// 由 exec 用于用户堆栈保护页。
 //权限管理 将页表项标记为无效，禁止用户访问，用于保护用户堆栈
 void
 uvmclear(pagetable_t pagetable, uint64 va)

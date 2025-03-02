@@ -67,7 +67,6 @@ main()
     plicinithart();   // 请求 PLIC 设备中断
     trapinithart();   // 安装内核陷阱向量
   }
-  printf("15\n");
+  printf("进入调度器\n");
   scheduler();
-   
 }

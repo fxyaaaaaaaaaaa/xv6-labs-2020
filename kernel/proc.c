@@ -175,6 +175,7 @@ freeproc(struct proc *p)
   //这会导致内核运行所需要的关键物理页被释放，导致内核崩溃
   //递归释放进程独享的页表，释放页表本身所占用空间，但不释放页表指向的物理页。
   kama_kvm_free_kernelpgtbl(p->kama_kernelpgtbl);
+  //proc_freepagetable(p->kama_kernelpgtbl,PGSIZE);
   p->kama_kernelpgtbl = 0;
   p->state = UNUSED;
 }
@@ -222,6 +223,9 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 
 // a user program that calls exec("/init")
 // od -t xC initcode
+//RISC-V 架构的指令集编码。是一个用户程序的二进制表示。
+//在操作系统启动后，内核可能会创建一个初始用户进程，并将 initcode 作为该进程的初始代码。
+//该进程运行时，它会调用 exec，加载并执行 /init 程序，从而启动用户空间的初始化过程
 uchar initcode[] = {
   0x17, 0x05, 0x00, 0x00, 0x13, 0x05, 0x45, 0x02,
   0x97, 0x05, 0x00, 0x00, 0x93, 0x85, 0x35, 0x02,
@@ -700,6 +704,7 @@ either_copyout(int user_dst, uint64 dst, void *src, uint64 len)
 // Copy from either a user address, or kernel address,
 // depending on usr_src.
 // Returns 0 on success, -1 on error.
+//user_src表示数据来源是用户空间还是内核空间
 int
 either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 {

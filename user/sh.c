@@ -149,6 +149,7 @@ main(void)
 
   // Ensure that three file descriptors are open.
   while((fd = open("console", O_RDWR)) >= 0){
+    printf("init sh\n");
     if(fd >= 3){
       close(fd);
       break;

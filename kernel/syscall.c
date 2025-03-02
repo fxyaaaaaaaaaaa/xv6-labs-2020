@@ -172,7 +172,6 @@ syscall(void)
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // 调用对应的处理函数，并将返回值存储在a0寄存器中
     p->trapframe->a0 = syscalls[num]();
-
     // 如果当前进程启动了trace跟踪，则打印信息
     // 这里将kama_syscall_trace >>num &1是为了判断当前进程是否跟踪系统调用号为num的系统调用
   } else {

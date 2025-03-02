@@ -48,15 +48,17 @@ printptr(int fd, uint64 x) {
 }
 
 // Print to the given fd. Only understands %d, %x, %p, %s.
+//vprintf 函数通过遍历格式字符串，根据不同的状态处理普通字符和格式化占位符.
+//从可变参数列表中获取相应的参数，并将格式化后的字符串输出到指定的文件描述符中。这样就实现了简单的格式化输出功能。
 void
 vprintf(int fd, const char *fmt, va_list ap)
 {
   char *s;
   int c, i, state;
-
+  //state是用来记录当前的状态的，是否遇到了'%'字符
   state = 0;
   for(i = 0; fmt[i]; i++){
-    c = fmt[i] & 0xff;
+    c = fmt[i] & 0xff; //将c变为无符号字符
     if(state == 0){
       if(c == '%'){
         state = '%';
@@ -64,15 +66,15 @@ vprintf(int fd, const char *fmt, va_list ap)
         putc(fd, c);
       }
     } else if(state == '%'){
-      if(c == 'd'){
+      if(c == 'd'){//整形 int
         printint(fd, va_arg(ap, int), 10, 1);
-      } else if(c == 'l') {
+      } else if(c == 'l') {//uint64 整形
         printint(fd, va_arg(ap, uint64), 10, 0);
-      } else if(c == 'x') {
+      } else if(c == 'x') {//十六进制整形
         printint(fd, va_arg(ap, int), 16, 0);
-      } else if(c == 'p') {
+      } else if(c == 'p') {//uint64 地址
         printptr(fd, va_arg(ap, uint64));
-      } else if(c == 's'){
+      } else if(c == 's'){//获取一个字符串s
         s = va_arg(ap, char*);
         if(s == 0)
           s = "(null)";
@@ -106,7 +108,7 @@ fprintf(int fd, const char *fmt, ...)
 void
 printf(const char *fmt, ...)
 {
-  va_list ap;
+  va_list ap;//可变参
 
   va_start(ap, fmt);
   vprintf(1, fmt, ap);
