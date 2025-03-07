@@ -1,17 +1,17 @@
 // Buffer cache.
 //
-// The buffer cache is a linked list of buf structures holding
-// cached copies of disk block contents.  Caching disk blocks
-// in memory reduces the number of disk reads and also provides
-// a synchronization point for disk blocks used by multiple processes.
+// 缓冲区缓存是 buf 结构的链接列表，持有
+// 磁盘块内容的缓存副本。缓存磁盘块
+// in memory 减少了磁盘读取次数，并且还提供
+// 多个进程使用的磁盘块的同步点。
 //
 // Interface:
-// * To get a buffer for a particular disk block, call bread.
-// * After changing buffer data, call bwrite to write it to disk.
-// * When done with the buffer, call brelse.
-// * Do not use the buffer after calling brelse.
-// * Only one process at a time can use a buffer,
-//     so do not keep them longer than necessary.
+// * 要获取特定磁盘块的缓冲区，请调用 bread。
+// * 更改缓冲区数据后，调用 bwrite 将其写入磁盘。
+// * 完成缓冲区后，调用 brelse.
+// * 调用 brelse 后不要使用缓冲区。
+// * 一次只有一个进程可以使用缓冲区，
+// 因此，不要将它们保留超过必要的时间。
 
 
 #include "types.h"
@@ -27,9 +27,9 @@ struct {
   struct spinlock lock;
   struct buf buf[NBUF];
 
-  // Linked list of all buffers, through prev/next.
-  // Sorted by how recently the buffer was used.
-  // head.next is most recent, head.prev is least.
+  // 所有缓冲区的链接列表，通过 prev/next。
+  // 按缓冲区的最近使用时间排序。
+  // head.next 是最新的，head.prev 是最不重要的。
   struct buf head;
 } bcache;
 
@@ -40,7 +40,7 @@ binit(void)
 
   initlock(&bcache.lock, "bcache");
 
-  // Create linked list of buffers
+  //创建缓冲区的链接列表
   bcache.head.prev = &bcache.head;
   bcache.head.next = &bcache.head;
   for(b = bcache.buf; b < bcache.buf+NBUF; b++){
@@ -52,9 +52,9 @@ binit(void)
   }
 }
 
-// Look through buffer cache for block on device dev.
-// If not found, allocate a buffer.
-// In either case, return locked buffer.
+// 在缓冲区缓存中查找设备 dev 上的块。
+// 如果未找到，则分配缓冲区。
+// 无论哪种情况，都返回 locked buffer。
 static struct buf*
 bget(uint dev, uint blockno)
 {
@@ -88,7 +88,7 @@ bget(uint dev, uint blockno)
   panic("bget: no buffers");
 }
 
-// Return a locked buf with the contents of the indicated block.
+//返回一个锁定的 buf 以及指示块的内容。
 struct buf*
 bread(uint dev, uint blockno)
 {
@@ -102,7 +102,7 @@ bread(uint dev, uint blockno)
   return b;
 }
 
-// Write b's contents to disk.  Must be locked.
+//R 将 b 的内容写入磁盘。必须被锁定。
 void
 bwrite(struct buf *b)
 {
@@ -111,8 +111,8 @@ bwrite(struct buf *b)
   virtio_disk_rw(b, 1);
 }
 
-// Release a locked buffer.
-// Move to the head of the most-recently-used list.
+// 释放锁定的缓冲区。
+// 移·
 void
 brelse(struct buf *b)
 {

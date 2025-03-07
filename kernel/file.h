@@ -1,3 +1,7 @@
+//file.c文件涉及到关于file层面的操作，上接系统调用代码的接口层面代码，下接inode操作层面的操作代码。
+
+
+
 struct file {
 #ifdef LAB_NET
   enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE, FD_SOCK } type;

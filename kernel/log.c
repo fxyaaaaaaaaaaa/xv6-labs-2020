@@ -190,6 +190,8 @@ write_log(void)
   }
 }
 
+//先使用write_log()将log_header中记录的bcache中的block写入磁盘log中的block，然后调用write_head()将logheader中的信息进行写入磁盘log中
+//使用install_trans()将磁盘log中的记录写进真正的文件数据区域，最终调用write_head()刷新磁盘log区域
 static void
 commit()
 {
@@ -215,7 +217,6 @@ void
 log_write(struct buf *b)
 {
   int i;
-
   if (log.lh.n >= LOGSIZE || log.lh.n >= log.size - 1)
     panic("too big a transaction");
   if (log.outstanding < 1)
