@@ -79,47 +79,50 @@ kfree(void *pa)
 // Allocate one 4096-byte page of physical memory.
 // Returns a pointer that the kernel can use.
 // Returns 0 if the memory cannot be allocated.
+
+
+//下面这段代码有死锁的可能性 但是还没有找到解决的办法
+//死锁原因：当A线程持有A锁 想要持有B锁， 当B线程持有B锁 想要持有A锁，会发生死锁。
 void *
 kalloc(void)
 {
-  struct run *r;
+  struct run * r = 0;
   push_off();
-  int cpu = cpuid();
-  acquire(&kmem[cpu].lock);
-  if(!kmem[cpu].freelist) //当前CPU已经没有freelist的时候，去其他CPU偷内存页
+  int cid = cpuid();
+  acquire(&kmem[cid].lock);
+  if(!kmem[cid].freelist)
   {
-    int steal_left = 64;  //这里指定偷64个内存页
-    for(int i=0;i<NCPU;i++)
-    {
-        if(i == cpu)
-            continue;     //跳过当前页
-        acquire(&kmem[i].lock);
-        if(!kmem[i].freelist)   //如果想要偷页的CPU也没有freelist了释放锁
-        {
-            release(&kmem[i].lock);
-            continue;
-        }
-        struct run*rr = kmem[i].freelist;
-        while(rr && steal_left)   //循环将kmem[i]的freelist移动到kmem[CPU]中
-        {
-            kmem[i].freelist = rr->next;
-            rr->next = kmem[cpu].freelist;
-            kmem[cpu].freelist =  rr;
-            rr = kmem[i].freelist;
-            steal_left -- ;
-        } 
-        release(&kmem[i].lock);
-
-        if(steal_left == 0)
-            break;
-    }
+      int steal_page = 64;
+      for(int i=0;i<NCPU;i++)
+      {
+          if(i == cid)
+              continue;
+          acquire(&kmem[i].lock);
+          if(kmem[i].freelist == 0)
+          {
+              release(&kmem[i].lock);
+              continue;
+          }
+          while(steal_page && kmem[i].freelist)
+          {
+            r = kmem[i].freelist;
+            kmem[i].freelist = r->next;
+            r->next = kmem[cid].freelist;
+            kmem[cid].freelist = r;
+            steal_page--;
+          }
+          release(&kmem[i].lock);
+          if(steal_page == 0)
+              break;
+      }
   }
-  r = kmem[cpu].freelist;
+  r = kmem[cid].freelist;
   if(r)
-    kmem[cpu].freelist = r->next;
-  release(&kmem[cpu].lock);
-  pop_off();      //打开中断
+    kmem[cid].freelist = r->next;
+  release(&kmem[cid].lock);
+  pop_off();                //打开中断
+
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
-  return (void*)r;
+  return r;
 }
