@@ -6,8 +6,13 @@
 // Memory allocator by Kernighan and Ritchie,
 // The C programming Language, 2nd ed.  Section 8.7.
 
+//这里的内存分配器的内存组织形式是：
+//freep->[Header1] -> [用户数据]->[Header2] -> [用户数据]->[Header1]
+
+
 typedef long Align;
 
+//16字节的一个Header，用于记录空闲块的大小和下一个空闲块的地址
 union header {
   struct {
     union header *ptr;
@@ -21,11 +26,16 @@ typedef union header Header;
 static Header base;
 static Header *freep;
 
+//通过将bp插入到地址相邻的地方，方便合并相邻的空闲块，减少外部碎片。
+//具体来说：
+//1.找到合适的插入地方，找到bp应该插入的地方，使得bp的地址和链表中某个块的地址相邻。
+//2.合并相邻的空闲块，如果bp的末尾与下一个块开头相邻，则合并这两个块，如果bp的开头与前一个块模块相邻，则合并这两个块。
 void
 free(void *ap)
 {
   Header *bp, *p;
 
+  //之所以-1是因为，在malloc分配内存时会多分配一个Header的空间记录后续的内存块大小
   bp = (Header*)ap - 1;
   for(p = freep; !(bp > p && bp < p->s.ptr); p = p->s.ptr)
     if(p >= p->s.ptr && (bp > p || bp < p->s.ptr))
@@ -66,6 +76,7 @@ malloc(uint nbytes)
   Header *p, *prevp;
   uint nunits;
 
+  //计算需要分配的内存块数(以Header为单元)
   nunits = (nbytes + sizeof(Header) - 1)/sizeof(Header) + 1;
   if((prevp = freep) == 0){
     base.s.ptr = freep = prevp = &base;
